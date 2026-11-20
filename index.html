@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Secret Santa Organizer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#fbf7f2;--card:#fff;--tx:#1f2a24;--mu:#66726b;--bd:#e4ddd3;--ac:#b3262e;--ac2:#1f6b4a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15191a;--card:#1f2527;--tx:#eee9e1;--mu:#9aa6a0;--bd:#333c3e;--ac:#e5575e;--ac2:#4fb88a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:820px;margin:0 auto;padding:20px 16px 60px}
+h1{margin:0 0 4px;font-size:28px}p.sub{color:var(--mu);margin:0 0 16px}
+.tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.tab{flex:1;min-width:140px;background:var(--card);color:var(--mu);border:1px solid var(--bd);border-radius:10px;padding:10px;margin:0;font-weight:600}
+.tab.on{background:var(--ac);color:#fff;border-color:var(--ac)}.tab:disabled{opacity:.45;cursor:not-allowed}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:16px}
+h2{font-size:17px;margin:0 0 10px}label{display:block;font-size:13px;color:var(--mu);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:150px;resize:vertical}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:560px){.row{grid-template-columns:1fr}}
+button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:11px 16px;font:inherit;font-weight:600;cursor:pointer;margin:6px 8px 0 0}
+button.alt{background:var(--ac2)}button.ghost{background:transparent;color:var(--tx);border:1px solid var(--bd)}
+.hint{font-size:13px;color:var(--mu)}code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:13px}
+.p{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--bd);padding:8px 0;flex-wrap:wrap}
+.err{color:var(--ac);font-weight:600}.sec{display:none}.sec.on{display:block}
+.pv{white-space:pre-wrap;background:var(--bg);border:1px dashed var(--bd);border-radius:8px;padding:12px;font-size:14px}.ok{color:var(--ac2);font-weight:600}.warn{color:#b7791f;font-weight:600}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd);vertical-align:top}th{color:var(--mu);font-weight:600}
+</style></head><body><main>
+<h1>🎅 Secret Santa Organizer</h1>
+<p class="sub">Upload, draw, check the matches, then export and send.</p>
+<div class="tabs"><button class="tab on" id="b1" onclick="show(1)">1 · Upload &amp; message</button><button class="tab" id="b2" onclick="show(2)" disabled>2 · View the draw</button><button class="tab" id="b3" onclick="show(3)" disabled>3 · Send emails</button></div>
+
+<section class="sec on" id="t1"><div id="err2" class="err" style="margin-bottom:12px"></div>
+<div class="card"><h2>The basics</h2>
+<div class="row"><div><label>Event name</label><input id="ev" value="End of Year Party 🎄"></div>
+<div><label>Your name (organizer)</label><input id="org" placeholder="e.g. John Doe"></div></div>
+<div class="row"><div><label>Gift budget</label><input id="amt" type="number" value="5000" min="0"></div>
+<div><label>Currency</label><select id="cur">
+<option value="₦|NGN" selected>₦ Nigerian Naira (NGN)</option><option value="$|USD">$ US Dollar</option><option value="£|GBP">£ British Pound</option><option value="€|EUR">€ Euro</option><option value="C$|CAD">C$ Canadian Dollar</option><option value="GH₵|GHS">GH₵ Ghanaian Cedi</option><option value="KSh|KES">KSh Kenyan Shilling</option></select></div></div>
+<label>Party / gift exchange date</label><input id="dt" placeholder="e.g. Friday, 19 December 2026">
+</div>
+<div class="card"><h2>Participants</h2>
+<label>📂 Upload your employee CSV (columns: Name, Email, and an optional Wishlist)</label><input type="file" id="csv" accept=".csv,text/csv" onchange="loadCSV(this)"><div id="csvst" class="hint" style="margin:6px 0"></div>
+<label>Or type or edit the list here: <code>Name, email, wishlist</code> (wishlist optional, minimum 3 people)</label>
+<textarea id="ppl" placeholder="Ada Obi, ada@company.com, Scented candles&#10;Tunde Bello, tunde@company.com&#10;Chioma Eze, chioma@company.com"></textarea>
+</div>
+<div class="card"><h2>Your message</h2>
+<p class="hint">Write the message however you like, emojis welcome. Anything in curly brackets, like <code>{receiver}</code>, is filled in automatically, so leave those exactly as they are. The preview below the body shows how it will look.</p>
+<label>Email subject</label><input id="sub" value="🎁 Your Secret Santa match for {event}">
+<label>Email body</label>
+<textarea id="body">Hello {giver}! 🎅
+
+The Secret Santa draw for {event} is done, and you will be gifting: ✨ {receiver} ✨
+
+💰 Budget: {amount}
+📅 Date: {date}
+
+{wishlist}
+
+Please keep it a secret, that’s the fun part! 🤫
+
+Merry Christmas,
+{organizer} 🎄</textarea>
+<div id="tpl" class="hint" style="margin:6px 0"></div>
+<button type="button" class="ghost" onclick="resetBody()">↩️ Reset body to default</button>
+<label style="margin-top:14px">👀 Live preview (sample names, updates as you type)</label><div id="pv" class="pv"></div>
+<label>Line used when the person has no wishlist (wishlists are optional)</label>
+<input id="nowl" value="🎁 {receiver} hasn’t shared a wishlist, so surprise them with something thoughtful!">
+<label>Line used when they do have one</label>
+<input id="yeswl" value="📝 {receiver}’s wishlist (just ideas, not a must): {list}">
+<div id="err" class="err"></div>
+<button onclick="draw()">🎲 Draw names &amp; view the draw →</button>
+</div></section>
+
+<section class="sec" id="t2"><div class="card"><h2>The draw</h2><div id="msg"></div>
+<div class="tw"><table><thead><tr><th>#</th><th>Gifter</th><th>Gifter’s email</th><th>🎁 Gifting to</th><th>Receiver’s wishlist</th></tr></thead><tbody id="tb"></tbody></table></div>
+<div style="margin-top:12px;padding:12px;border:1px solid var(--bd);border-radius:10px"><b>📊 Download the matched list in Excel</b><p class="hint" style="margin:4px 0">Every pairing (gifter, email, receiver, wishlist, budget, date). Save it in OneDrive to keep it as an online Excel sheet.</p><button class="alt" onclick="xl()">⬇️ Download Excel (.xlsx)</button><button class="ghost" onclick="copyT()">📋 Copy for pasting into Excel</button><button class="ghost" onclick="csvDl()">CSV</button><span id="xs" class="hint"></span></div>
+<button class="ghost" onclick="draw(true)">🔀 Reshuffle</button><button class="ghost" onclick="show(1)">← Edit list or message</button><button class="alt" onclick="show(3)">Looks good, continue to send emails →</button>
+</div></section>
+
+<section class="sec" id="t3">
+<div class="card"><h2>✉️ Send all emails from your company Outlook</h2>
+<p style="margin:0"><b>Option A: Outlook macro</b> <span class="hint">(classic Outlook on Windows, fastest)</span></p>
+<ol class="hint" style="padding-left:18px;margin:4px 0 8px"><li>Click <b>Copy Outlook macro</b>.</li><li>Open Outlook, press <b>Alt + F11</b>, choose <b>Insert → Module</b>, and paste.</li><li>Click anywhere inside <code>SendSecretSantas</code> (the first block) and press <b>F5</b>. If Outlook asks to allow access, click Allow.</li></ol>
+<button class="alt" onclick="copyVBA()">📋 Copy Outlook macro</button><span id="cv" class="hint"></span>
+<div style="margin-top:10px;padding:10px;border:1px solid var(--bd);border-radius:10px"><p class="hint" style="margin:0 0 6px"><b>Alt + F11 not working? Use this instead (no editor needed):</b> click the button, open <b>Notepad</b>, paste, choose <b>File → Save as</b>, set “Save as type” to <b>All files</b>, name it <code>SendSantas.vbs</code>, then double-click that file. Classic Outlook must be open.</p><button class="alt" onclick="copyVBS()">📋 Copy as .vbs file</button><span id="cs" class="hint"></span><p class="hint" style="margin:6px 0 0">You can also try <b>Fn + Alt + F11</b>, or File → Options → Customize Ribbon → tick <b>Developer</b> → Visual Basic.</p></div>
+<p style="margin:16px 0 0"><b>Option B: Power Automate</b> <span class="hint">(works with Outlook on the web or Mac)</span></p>
+<ol class="hint" style="padding-left:18px;margin:4px 0 8px"><li>Download the Excel from Stage 2. It already has <b>Email subject</b> and <b>Email message</b> columns for every person.</li><li>In Excel select the data, press <b>Ctrl + T</b> to make it a table, and save it in <b>OneDrive</b>.</li><li>At make.powerautomate.com create a flow: <b>Excel Online → List rows present in a table</b>, then <b>Apply to each</b>, then <b>Outlook → Send an email (V2)</b>. Set To = Gifter email, Subject = Email subject, Body = Email message.</li><li>In Body, to keep line breaks use the expression: <code>replace(items('Apply_to_each')?['Email message'], decodeUriComponent('%0A'), '&lt;br&gt;')</code></li></ol>
+<details style="margin-top:12px"><summary class="hint">Option C: Gmail script (only if you have a Gmail account)</summary><ol class="hint" style="padding-left:18px"><li>Click Copy auto-send script, open script.google.com, create a New project and paste.</li><li>Click Run and allow permission.</li></ol>
+<button class="alt" onclick="copyScript()">📋 Copy auto-send script</button><span id="cp" class="hint"></span></details>
+<p class="hint">Backup: send one at a time from your mail app.</p><div id="lst"></div></div>
+<button class="ghost" onclick="show(2)">← Back to the draw</button></section>
+</main>
+<script>
+var mails=[];
+function $(i){return document.getElementById(i)}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function fill(t,v){for(var k in v){t=t.split("{"+k+"}").join(v[k])}return t}
+function fail(m){$("err").textContent=m;$("err2").textContent=m;show(1)}
+window.onerror=function(m){$("err2").textContent="Something went wrong: "+m;};
+function show(n){[1,2,3].forEach(function(i){$("t"+i).className="sec"+(i==n?" on":"");$("b"+i).className="tab"+(i==n?" on":"")});window.scrollTo(0,0)}
+function parseCSV(t){t=t.replace(/^\uFEFF/,"");var rows=[],r=[],f="",q=false;for(var i=0;i<t.length;i++){var c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==","){r.push(f);f=""}else if(c=="\n"||c=="\r"){if(c=="\r"&&t[i+1]=="\n")i++;r.push(f);f="";rows.push(r);r=[]}else f+=c}if(f!==""||r.length){r.push(f);rows.push(r)}return rows.filter(function(x){return x.join("").trim()})}
+function loadCSV(inp){var file=inp.files[0],st=$("csvst");if(!file)return;var fr=new FileReader();fr.onload=function(){
+ var rows=parseCSV(String(fr.result)),h=rows[0].map(function(x){return x.trim().toLowerCase()});
+ var hasH=h.some(function(x){return x.indexOf("mail")>-1});
+ var ni=-1,ei=-1,wi=-1,fi=-1,li=-1;
+ if(hasH){h.forEach(function(x,i){if(x.indexOf("mail")>-1&&ei<0)ei=i;else if(/wish/.test(x))wi=i;else if(/first/.test(x))fi=i;else if(/last|surname/.test(x))li=i;else if(/name/.test(x)&&ni<0)ni=i});rows=rows.slice(1)}else{ni=0;ei=1;wi=2}
+ var lines=[];rows.forEach(function(r){var nm=ni>-1?r[ni]:((fi>-1?r[fi]:"")+" "+(li>-1?r[li]:""));nm=(nm||"").replace(/,/g," ").replace(/\s+/g," ").trim();var em=ei>-1?(r[ei]||"").trim():"";if(!/^\S+@\S+\.\S+$/.test(em)){var f2=r.filter(function(c){return /^\S+@\S+\.\S+$/.test((c||"").trim())})[0];if(f2)em=f2.trim()}if(!nm){nm=(r.filter(function(c){return c&&c.trim()&&c.trim()!==em})[0]||"").trim()}var wl=wi>-1?(r[wi]||"").trim():"";if(!nm&&!em)return;lines.push(nm+", "+em+(wl?", "+wl:""))});
+ $("ppl").value=lines.join("\n");st.textContent="✅ Loaded "+lines.length+" people from "+file.name+". Check the list, then draw."};fr.readAsText(file)}
+var KEYS=["giver","receiver","amount","event","date","organizer","wishlist","list","giver_first","receiver_first"],lastF="body",DEF="";
+function checkTpl(){
+ var bad=[],b=$("body").value,block="",warn=[],unb=false;
+ ["sub","body","nowl","yeswl"].forEach(function(i){var v=$(i).value;
+  (v.match(/\{[^{}\n]*\}/g)||[]).forEach(function(t){var k=t.slice(1,-1);if(KEYS.indexOf(k)<0&&bad.indexOf(t)<0)bad.push(t)});
+  if((v.replace(/\{[^{}\n]*\}/g,"").match(/[{}]/g)||[]).length)unb=true});
+ if(b.indexOf("{receiver}")<0)block="Your email body must include {receiver}, otherwise nobody learns who they are gifting. Type {receiver} back in exactly, or use Reset body to default.";
+ else if(bad.length)block="Unrecognised tag(s): "+bad.join(" ")+". Tags must be spelled exactly, for example {receiver}. Fix the spelling or use Reset body to default.";
+ else if(unb)block="There is a stray { or } in your message. Tags must look like {receiver}, with both brackets.";
+ if(!block){if(b.indexOf("{giver}")<0)warn.push("no {giver} tag, so emails won’t greet each person by name");if(b.indexOf("{wishlist}")<0)warn.push("no {wishlist} tag, so wishlists won’t be included")}
+ var el=$("tpl");if(el){el.innerHTML=block?'<span class="err">⚠️ '+esc(block)+'</span>':(warn.length?'<span class="warn">ℹ️ Note: '+esc(warn.join("; "))+'.</span>':'<span class="ok">✅ All tags look good.</span>')}
+ return {block:block}}
+function prev(){var cur=$("cur").value.split("|")[0],a=Number($("amt").value||0);
+ var v={giver:"Ada Obi",giver_first:"Ada",receiver:"Tunde Bello",receiver_first:"Tunde",event:$("ev").value,date:$("dt").value||"to be announced",organizer:$("org").value||"Your organizer",amount:cur+a.toLocaleString("en-NG")};
+ v.wishlist=fill($("yeswl").value,Object.assign({},v,{list:"Scented candles"}));
+ $("pv").textContent=fill($("body").value,v)}
+function upd(){checkTpl();prev()}
+function resetBody(){$("body").value=DEF;upd()}
+function fn(n){return String(n||"").trim().split(/\s+/)[0]}
+function draw(again){
+ var ppl=$("ppl").value.split("\n").map(function(l){return l.trim()}).filter(Boolean).map(function(l){
+  var p=l.split(",").map(function(x){return x.trim()});return {name:p[0],email:p[1]||"",list:p.slice(2).join(", ")}});
+ var e=$("err");e.textContent="";
+ $("err2").textContent="";var tp=checkTpl();if(tp.block){fail(tp.block);return}if(ppl.length<3){fail("Add at least 3 people (one per line, with a valid email).");return}
+ var bad=ppl.filter(function(p){return !/^\S+@\S+\.\S+$/.test(p.email)});
+ if(bad.length){fail("The draw can’t run yet. Missing or invalid email for: "+bad.map(function(b){return b.name||"(no name)"}).join(", ")+". Fix these lines in the Participants box and try again.");return}
+ var s=ppl.slice();for(var i=s.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=s[i];s[i]=s[j];s[j]=t}
+ var cur=$("cur").value.split("|")[0],a=Number($("amt").value||0);
+ var base={event:$("ev").value,date:$("dt").value||"to be announced",organizer:$("org").value||"Your organizer",amount:cur+a.toLocaleString("en-NG")};
+ mails=s.map(function(g,i){var r=s[(i+1)%s.length];var v=Object.assign({},base,{giver:g.name,receiver:r.name,giver_first:fn(g.name),receiver_first:fn(r.name)});
+  v.wishlist=r.list?fill($("yeswl").value,Object.assign({},v,{list:r.list})):fill($("nowl").value,v);
+  return {to:g.email,giver:g.name,receiver:r.name,rl:r.list,re:r.email,budget:base.amount,date:base.date,subject:fill($("sub").value,v),body:fill($("body").value,v)}});
+ $("msg").innerHTML='<p>✅ '+mails.length+' people matched. Nobody is paired with themselves.'+(again?' (Reshuffled)':'')+'</p>';
+ $("tb").innerHTML=mails.map(function(x,i){return '<tr><td>'+(i+1)+'</td><td>'+esc(x.giver)+'</td><td>'+esc(x.to)+'</td><td><b>'+esc(x.receiver)+'</b></td><td>'+(esc(x.rl)||'<span class="hint">none</span>')+'</td></tr>'}).join("");
+ $("lst").innerHTML=mails.map(function(x,i){return '<div class="p"><span>'+esc(x.giver)+' <span class="hint">'+esc(x.to)+'</span></span><button class="ghost" onclick="mt('+i+')">Open email</button></div>'}).join("");
+ $("b2").disabled=false;$("b3").disabled=false;show(2)}
+function mt(i){var x=mails[i];location.href="mailto:"+x.to+"?subject="+encodeURIComponent(x.subject)+"&body="+encodeURIComponent(x.body)}
+function rowsAoA(){return [["#","Gifter","Gifter email","Gifting to","Receiver email","Receiver wishlist","Budget","Date","Email subject","Email message"]].concat(mails.map(function(x,i){return [i+1,x.giver,x.to,x.receiver,x.re,x.rl||"",x.budget,x.date,x.subject,x.body]}))}
+function save(name,data){var s=$("xs");
+ try{var blob=data instanceof Blob?data:new Blob([data],{type:name.slice(-4)==="xlsx"?"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"text/csv;charset=utf-8"});
+ var u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},2000);s.textContent=" ✅ Saved "+name}catch(e){s.textContent=" Couldn’t save. Use Copy for pasting into Excel."}}
+function xl(){if(!window.XLSX){$("xs").textContent=" Excel tool didn’t load. Use Copy for pasting into Excel.";return}
+ var ws=XLSX.utils.aoa_to_sheet(rowsAoA());ws["!cols"]=[{wch:4},{wch:24},{wch:30},{wch:24},{wch:30},{wch:36},{wch:12},{wch:24},{wch:40},{wch:70}];
+ var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Secret Santa Draw");
+ save("Secret-Santa-Draw.xlsx",XLSX.write(wb,{bookType:"xlsx",type:"array"}))}
+function csvDl(){save("Secret-Santa-Draw.csv","\uFEFF"+rowsAoA().map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"'}).join(",")}).join("\r\n"))}
+function copyT(){var t=rowsAoA().map(function(r){return r.map(function(c){c=String(c);return /[\n"\t]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join("\t")}).join("\n");cp(t,$("xs"),"✅ Copied. Open Excel, click a cell, and paste.")}
+function cp(t,c,ok){function fb(){var a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");c.textContent=" "+ok}catch(e){c.textContent=" Copy failed"}a.remove()}
+ if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){c.textContent=" "+ok},fb)}else fb()}
+function vb(n,str){var o=[n+' = ""'],cur="",k=n+' = '+n+' & ';
+ function fl(){if(cur){o.push(k+'"'+cur+'"');cur=""}}
+ for(var i=0;i<str.length;i++){var c=str.charCodeAt(i);
+  if(c==13)continue;
+  if(c==10){fl();o.push(k+'vbCrLf')}
+  else if(c==34){cur+='""'}
+  else if(c>=32&&c<127){cur+=str.charAt(i);if(cur.length>120)fl()}
+  else{fl();o.push(k+'ChrW('+c+')')}}
+ fl();return o.join("\n")}
+function copyVBA(){var out='Sub SendSecretSantas()\n',subs='';
+ mails.forEach(function(x,i){out+='    P'+(i+1)+'\n';
+  subs+='Private Sub P'+(i+1)+'()\n    Dim s As String, b As String\n'+vb('s',x.subject).replace(/^/gm,'    ')+'\n'+vb('b',x.body).replace(/^/gm,'    ')+'\n    SendOne "'+x.to.replace(/"/g,'')+'", s, b\nEnd Sub\n\n'});
+ out+='    MsgBox "Done: '+mails.length+' emails sent."\nEnd Sub\n\nPrivate Sub SendOne(ByVal toAddr As String, ByVal subj As String, ByVal msgBody As String)\n    Dim ol As Object, mi As Object\n    Set ol = CreateObject("Outlook.Application")\n    Set mi = ol.CreateItem(0)\n    mi.To = toAddr\n    mi.Subject = subj\n    mi.Body = msgBody\n    mi.Send\nEnd Sub\n\n'+subs;
+ cp(out,$("cv"),"Copied! Now paste into the Outlook macro editor.")}
+function copyVBS(){var o='On Error Resume Next\nSet ol = CreateObject("Outlook.Application")\nIf Err.Number <> 0 Then\n MsgBox "Please open classic Outlook first, then run this file again."\n WScript.Quit\nEnd If\nOn Error GoTo 0\n';
+ mails.forEach(function(x){o+=vb('s',x.subject)+'\n'+vb('b',x.body)+'\nSendOne "'+x.to.replace(/"/g,'')+'", s, b\n'});
+ o+='MsgBox "Done: '+mails.length+' emails sent."\n\nSub SendOne(toAddr, subj, msgBody)\n Set mi = ol.CreateItem(0)\n mi.To = toAddr\n mi.Subject = subj\n mi.Body = msgBody\n mi.Send\nEnd Sub\n';
+ cp(o,$("cs"),"Copied! Paste into Notepad and save as SendSantas.vbs")}
+function copyScript(){cp("function sendSecretSantas() {\n  var mails = "+JSON.stringify(mails.map(function(x){return {to:x.to,subject:x.subject,body:x.body}}),null,1)+";\n  mails.forEach(function(m) {\n    MailApp.sendEmail(m.to, m.subject, m.body);\n  });\n}\n",$("cp"),"Copied!")}
+DEF=$("body").value;
+["sub","body","nowl","yeswl"].forEach(function(i){$(i).addEventListener("focus",function(){lastF=i});$(i).addEventListener("input",upd)});
+["ev","org","amt","dt","cur"].forEach(function(i){$(i).addEventListener("input",prev);$(i).addEventListener("change",prev)});
+upd();
+</script></body></html>
